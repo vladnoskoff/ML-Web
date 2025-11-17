@@ -3,15 +3,14 @@ from __future__ import annotations
 
 import io
 import logging
-import os
 from collections import Counter
-from pathlib import Path
 
 import pandas as pd
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from .config import settings
 from .feedback import FeedbackStore
 from .model import SentimentModel
 from .schemas import (
@@ -28,45 +27,45 @@ from .schemas import (
 )
 from .stats import StatsTracker
 
-MODEL_PATH = Path(os.getenv("MODEL_PATH", "models/baseline.joblib"))
-TRANSFORMER_DIR = Path(os.getenv("TRANSFORMER_DIR", "models/transformer"))
-FRONTEND_DIR = Path("frontend")
-FEEDBACK_PATH = Path("data/feedback.jsonl")
-MAX_FILE_RECORDS = 1000
+MAX_FILE_RECORDS = settings.max_file_records
 
 logging.basicConfig(level=logging.INFO)
 app = FastAPI(title="ML-Web Sentiment API", version="1.0.0")
 logger = logging.getLogger(__name__)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-if FRONTEND_DIR.exists():
-    app.mount("/ui", StaticFiles(directory=FRONTEND_DIR, html=True), name="ui")
+if settings.frontend_dir.exists():
+    app.mount("/ui", StaticFiles(directory=settings.frontend_dir, html=True), name="ui")
 
 sentiment_model: SentimentModel | None = None
-stats_tracker = StatsTracker(max_history=100)
-feedback_store = FeedbackStore(FEEDBACK_PATH, cache_size=200)
+stats_tracker = StatsTracker(
+    max_history=settings.stats_max_history, history_path=settings.history_path
+)
+feedback_store = FeedbackStore(settings.feedback_path, cache_size=200)
 
 
 @app.on_event("startup")
 def load_model() -> None:
     global sentiment_model
-    target_path = MODEL_PATH
-    if not target_path.exists() and TRANSFORMER_DIR.exists():
-        target_path = TRANSFORMER_DIR
-        logger.info("Primary model missing, falling back to transformer dir %s", TRANSFORMER_DIR)
+    target_path = settings.model_path
+    if not target_path.exists() and settings.transformer_dir.exists():
+        target_path = settings.transformer_dir
+        logger.info(
+            "Primary model missing, falling back to transformer dir %s",
+            settings.transformer_dir,
+        )
     sentiment_model = SentimentModel(target_path)
     if not target_path.exists():
         logger.warning(
             "Model artifact %s is missing, using KeywordFallbackModel until training runs.",
             target_path,
         )
-    stats_tracker.reset()
 
 
 @app.get("/health")

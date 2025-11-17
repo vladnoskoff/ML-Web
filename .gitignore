@@ -6,5 +6,6 @@ models/transformer/
 reports/
 data/feedback.jsonl
 data/feedback_dataset.csv
+data/prediction_history.jsonl
 *.log
 .env

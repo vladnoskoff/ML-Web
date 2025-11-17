@@ -2,7 +2,7 @@ PYTHON ?= python
 PIP ?= pip
 UVICORN ?= uvicorn
 
-.PHONY: install train train-transformer eda evaluate serve docker-build docker-up docker-down feedback-export
+.PHONY: install train train-transformer eda evaluate serve docker-build docker-up docker-down feedback-export history-report
 
 install:
 	$(PIP) install -r requirements.txt
@@ -21,6 +21,9 @@ evaluate:
 
 feedback-export:
 	$(PYTHON) ml/feedback_to_dataset.py
+
+history-report:
+	$(PYTHON) ml/history_report.py
 
 serve:
 	$(UVICORN) backend.app.main:app --reload
