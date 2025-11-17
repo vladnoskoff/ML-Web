@@ -1,0 +1,13 @@
+version: "3.9"
+services:
+  api:
+    build: .
+    command: uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data
+      - ./frontend:/app/frontend
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1

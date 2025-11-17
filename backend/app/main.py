@@ -1,6 +1,7 @@
 """FastAPI service for the sentiment classifier."""
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -21,7 +22,9 @@ from .stats import StatsTracker
 MODEL_PATH = Path("models/baseline.joblib")
 FRONTEND_DIR = Path("frontend")
 
+logging.basicConfig(level=logging.INFO)
 app = FastAPI(title="ML-Web Sentiment API", version="1.0.0")
+logger = logging.getLogger(__name__)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -40,12 +43,12 @@ stats_tracker = StatsTracker(max_history=100)
 @app.on_event("startup")
 def load_model() -> None:
     global sentiment_model
-    try:
-        sentiment_model = SentimentModel(MODEL_PATH)
-    except FileNotFoundError as exc:
-        raise RuntimeError(
-            "Model file is missing. Run `python ml/train_baseline.py` first."
-        ) from exc
+    sentiment_model = SentimentModel(MODEL_PATH)
+    if not MODEL_PATH.exists():
+        logger.warning(
+            "Model file %s is missing, using KeywordFallbackModel until training runs.",
+            MODEL_PATH,
+        )
     stats_tracker.reset()
 
 
