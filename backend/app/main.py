@@ -1,10 +1,13 @@
 """FastAPI service for the sentiment classifier."""
 from __future__ import annotations
 
+import io
 import logging
+from collections import Counter
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+import pandas as pd
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -13,6 +16,7 @@ from .model import SentimentModel
 from .schemas import (
     BatchPredictRequest,
     BatchPredictResponse,
+    FilePredictResponse,
     FeedbackListResponse,
     FeedbackRequest,
     FeedbackResponse,
@@ -26,6 +30,7 @@ from .stats import StatsTracker
 MODEL_PATH = Path("models/baseline.joblib")
 FRONTEND_DIR = Path("frontend")
 FEEDBACK_PATH = Path("data/feedback.jsonl")
+MAX_FILE_RECORDS = 1000
 
 logging.basicConfig(level=logging.INFO)
 app = FastAPI(title="ML-Web Sentiment API", version="1.0.0")
@@ -86,11 +91,79 @@ def predict_batch(request: BatchPredictRequest) -> BatchPredictResponse:
     return BatchPredictResponse(predictions=[PredictResponse(**pred) for pred in predictions])
 
 
+@app.post("/predict_file", response_model=FilePredictResponse)
+async def predict_file(file: UploadFile = File(...)) -> FilePredictResponse:
+    """Обработка CSV с колонкой text."""
+
+    try:
+        content = await file.read()
+    except Exception as exc:  # pragma: no cover - FastAPI handles IO
+        raise HTTPException(status_code=400, detail="Не удалось прочитать файл") from exc
+
+    if not content:
+        raise HTTPException(status_code=400, detail="Файл пустой")
+
+    try:
+        decoded = content.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise HTTPException(status_code=400, detail="CSV должен быть в кодировке UTF-8") from exc
+
+    try:
+        dataframe = pd.read_csv(io.StringIO(decoded))
+    except Exception as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Не удалось распарсить CSV: {exc}",
+        ) from exc
+
+    if "text" not in dataframe.columns:
+        raise HTTPException(status_code=400, detail="CSV должен содержать колонку 'text'")
+
+    input_rows = len(dataframe)
+    dataframe = dataframe.dropna(subset=["text"])
+    if dataframe.empty:
+        raise HTTPException(status_code=400, detail="В колонке 'text' нет строк для обработки")
+
+    if len(dataframe) > MAX_FILE_RECORDS:
+        dataframe = dataframe.head(MAX_FILE_RECORDS)
+
+    model = _require_model()
+    texts = dataframe["text"].astype(str).tolist()
+    raw_predictions = model.classify_batch(texts)
+
+    items = []
+    for idx, text, pred in zip(dataframe.index.tolist(), texts, raw_predictions):
+        stats_tracker.record(text, pred["label"], pred["scores"])
+        items.append({
+            "row": int(idx),
+            "text": text,
+            "label": pred["label"],
+            "scores": pred["scores"],
+        })
+
+    class_counts = Counter(item["label"] for item in items)
+    summary = {
+        "input_rows": int(input_rows),
+        "processed_rows": len(items),
+        "skipped_rows": max(0, int(input_rows) - len(items)),
+        "class_counts": dict(class_counts),
+    }
+
+    return FilePredictResponse(summary=summary, predictions=items)
+
+
 @app.get("/")
 def root() -> dict:
     return {
         "message": "Добро пожаловать в сервис анализа тональности",
-        "endpoints": ["/predict", "/predict_batch", "/stats", "/model", "/health"],
+        "endpoints": [
+            "/predict",
+            "/predict_batch",
+            "/predict_file",
+            "/stats",
+            "/model",
+            "/health",
+        ],
     }
 
 

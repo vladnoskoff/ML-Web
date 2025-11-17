@@ -102,6 +102,29 @@
         </div>
       </section>
 
+      <section class="panel panel--upload">
+        <div class="panel__column panel__column--full">
+          <h2>4. Пакетная классификация CSV</h2>
+          <p class="muted">
+            Загрузите CSV-файл с колонкой <code>text</code>, чтобы разом обработать до 1000 обращений и
+            получить распределение тональностей. Результаты можно скачать и добавить в отчёт.
+          </p>
+          <form id="bulk-form" class="bulk-form">
+            <label class="file-input">
+              <span id="bulk-file-label">Выберите CSV-файл</span>
+              <input type="file" id="bulk-file" accept=".csv,text/csv" required />
+            </label>
+            <button type="submit">Классифицировать файл</button>
+            <p id="bulk-status" class="bulk-form__status">
+              Файл должен быть в кодировке UTF-8 и содержать колонку <code>text</code>.
+            </p>
+          </form>
+          <div id="bulk-summary" class="bulk-summary hidden"></div>
+          <div id="bulk-table" class="bulk-table hidden"></div>
+          <button id="bulk-download" class="bulk-download hidden">Скачать результаты (CSV)</button>
+        </div>
+      </section>
+
       <section class="panel">
         <div class="panel__column">
           <h2>Статистика за сессию</h2>

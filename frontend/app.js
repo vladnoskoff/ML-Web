@@ -10,9 +10,17 @@ const modelDetail = document.getElementById('model-detail');
 const correctionForm = document.getElementById('correction-form');
 const feedbackNotes = document.getElementById('feedback-notes');
 const feedbackStatus = document.getElementById('feedback-status');
+const bulkForm = document.getElementById('bulk-form');
+const bulkFileInput = document.getElementById('bulk-file');
+const bulkFileLabel = document.getElementById('bulk-file-label');
+const bulkStatus = document.getElementById('bulk-status');
+const bulkSummary = document.getElementById('bulk-summary');
+const bulkTable = document.getElementById('bulk-table');
+const bulkDownload = document.getElementById('bulk-download');
 let chart;
 let lastPrediction = null;
 let lastAnalyzedText = '';
+let bulkPredictions = [];
 
 async function fetchJSON(url, options = {}) {
   const response = await fetch(url, {
@@ -100,6 +108,15 @@ function renderBars(scores) {
     wrapper.appendChild(bar);
     barsContainer.appendChild(wrapper);
   });
+}
+
+function toggleHidden(element, visible) {
+  if (!element) return;
+  if (visible) {
+    element.classList.remove('hidden');
+  } else {
+    element.classList.add('hidden');
+  }
 }
 
 function labelColor(label) {
@@ -235,6 +252,151 @@ if (correctionForm) {
       setFeedbackStatus(`Ошибка: ${error.message}`, 'error');
     } finally {
       correctionForm.classList.remove('loading');
+    }
+  });
+}
+
+function setBulkStatus(message, state = 'info') {
+  if (!bulkStatus) return;
+  bulkStatus.textContent = message;
+  const classes = ['bulk-form__status'];
+  if (state === 'error') {
+    classes.push('feedback-form__status--error');
+  }
+  bulkStatus.className = classes.join(' ');
+}
+
+function renderBulkSummary(summary) {
+  if (!bulkSummary) return;
+  const inputRows = summary?.input_rows ?? 0;
+  const processedRows = summary?.processed_rows ?? 0;
+  const skippedRows = summary?.skipped_rows ?? Math.max(0, inputRows - processedRows);
+  const countsMarkup = Object.entries(summary?.class_counts || {})
+    .map(([label, count]) => `<p><strong>${label}:</strong> ${count}</p>`)
+    .join('');
+  bulkSummary.innerHTML = `
+    <div class="bulk-summary__card">
+      <h4>Строк обработано</h4>
+      <p><strong>${processedRows}</strong> из ${inputRows}</p>
+      <p class="muted">Пропущено: ${skippedRows}</p>
+    </div>
+    <div class="bulk-summary__card">
+      <h4>Распределение классов</h4>
+      ${countsMarkup || '<p>Нет данных</p>'}
+    </div>
+  `;
+  toggleHidden(bulkSummary, true);
+}
+
+function renderBulkTable(predictions) {
+  if (!bulkTable) return;
+  if (!predictions.length) {
+    bulkTable.innerHTML = '';
+    toggleHidden(bulkTable, false);
+    return;
+  }
+  const rows = predictions
+    .map(
+      (pred) => `
+      <tr>
+        <td>${pred.row}</td>
+        <td>${pred.label}</td>
+        <td>${(pred.scores[pred.label] * 100).toFixed(1)}%</td>
+        <td>${pred.text}</td>
+      </tr>`
+    )
+    .join('');
+  bulkTable.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Класс</th>
+          <th>Уверенность</th>
+          <th>Текст</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+  toggleHidden(bulkTable, true);
+}
+
+function downloadBulkCSV() {
+  if (!bulkPredictions.length) return;
+  const header = ['row', 'label', 'confidence', 'text'];
+  const lines = [header.join(',')];
+  bulkPredictions.forEach((pred) => {
+    const confidence = pred.scores[pred.label] ?? 0;
+    const values = [pred.row, pred.label, confidence.toFixed(4), pred.text]
+      .map((value) => {
+        const stringValue = String(value ?? '');
+        if (stringValue.includes('"') || stringValue.includes(',') || stringValue.includes('\n')) {
+          return '"' + stringValue.replace(/"/g, '""') + '"';
+        }
+        return stringValue;
+      })
+      .join(',');
+    lines.push(values);
+  });
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'predictions.csv';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+if (bulkFileInput) {
+  bulkFileInput.addEventListener('change', () => {
+    if (!bulkFileLabel) return;
+    const file = bulkFileInput.files && bulkFileInput.files[0];
+    bulkFileLabel.textContent = file ? file.name : 'Выберите CSV-файл';
+  });
+}
+
+if (bulkDownload) {
+  bulkDownload.addEventListener('click', downloadBulkCSV);
+}
+
+if (bulkForm) {
+  bulkForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const file = bulkFileInput && bulkFileInput.files ? bulkFileInput.files[0] : null;
+    if (!file) {
+      setBulkStatus('Выберите CSV-файл.', 'error');
+      return;
+    }
+    const formData = new FormData();
+    formData.append('file', file);
+    bulkForm.classList.add('loading');
+    setBulkStatus('Файл отправлен, ждём результат…');
+    try {
+      const response = await fetch(`${API_BASE}/predict_file`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || 'Не удалось обработать файл');
+      }
+      const payload = await response.json();
+      bulkPredictions = payload.predictions || [];
+      renderBulkSummary(payload.summary || {});
+      renderBulkTable(bulkPredictions);
+      toggleHidden(bulkDownload, bulkPredictions.length > 0);
+      await refreshStats();
+      setBulkStatus('Готово! Результаты можно скачать ниже.');
+    } catch (error) {
+      setBulkStatus(`Ошибка: ${error.message}`, 'error');
+      toggleHidden(bulkSummary, false);
+      toggleHidden(bulkTable, false);
+      toggleHidden(bulkDownload, false);
+    } finally {
+      bulkForm.classList.remove('loading');
     }
   });
 }

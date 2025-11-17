@@ -103,6 +103,10 @@ main {
   flex-direction: column;
 }
 
+.panel--upload {
+  flex-direction: column;
+}
+
 .feedback-form {
   margin-top: 1rem;
   display: flex;
@@ -164,6 +168,101 @@ main {
 
 .feedback-form__status--error {
   color: var(--negative);
+}
+
+.bulk-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  margin-top: 1rem;
+}
+
+.file-input {
+  border: 2px dashed #cbd5f5;
+  border-radius: 1rem;
+  padding: 1rem 1.5rem;
+  cursor: pointer;
+  background: #f8fafc;
+  font-weight: 600;
+  color: #1d4ed8;
+  flex: 1;
+  min-width: 220px;
+}
+
+.file-input input {
+  display: none;
+}
+
+.bulk-form button {
+  margin-top: 0;
+}
+
+.bulk-form__status {
+  margin: 0;
+  color: var(--muted);
+  flex-basis: 100%;
+}
+
+.bulk-summary {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 1.5rem;
+}
+
+.bulk-summary__card {
+  flex: 1;
+  min-width: 180px;
+  border: 1px solid #e5e7eb;
+  border-radius: 1rem;
+  padding: 1rem;
+  background: #fdfdfd;
+}
+
+.bulk-summary__card h4 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.bulk-summary__card p {
+  margin: 0.2rem 0;
+}
+
+.bulk-table {
+  margin-top: 1.5rem;
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 1rem;
+}
+
+.bulk-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.bulk-table th,
+.bulk-table td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.bulk-table th {
+  background: #f8fafc;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.bulk-download {
+  margin-top: 1rem;
+  align-self: flex-start;
+}
+
+.hidden {
+  display: none !important;
 }
 
 label {

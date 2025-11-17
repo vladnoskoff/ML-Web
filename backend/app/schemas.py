@@ -75,3 +75,24 @@ class ModelInfoResponse(BaseModel):
     metrics: Optional[Dict[str, Any]] = None
     test_size: Optional[float] = None
     random_state: Optional[int] = None
+
+
+class FilePrediction(BaseModel):
+    row: int = Field(..., ge=0, description="Индекс строки в исходном файле")
+    text: str = Field(..., description="Текст обращения")
+    label: str = Field(..., description="Предсказанная тональность")
+    scores: Dict[str, float] = Field(..., description="Вероятности по классам")
+
+
+class FilePredictionSummary(BaseModel):
+    input_rows: int = Field(..., description="Количество строк в CSV")
+    processed_rows: int = Field(..., description="Сколько строк обработано")
+    skipped_rows: int = Field(..., description="Сколько строк пропущено")
+    class_counts: Dict[str, int] = Field(
+        ..., description="Количество предсказаний по классам"
+    )
+
+
+class FilePredictResponse(BaseModel):
+    summary: FilePredictionSummary
+    predictions: List[FilePrediction]
