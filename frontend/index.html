@@ -64,6 +64,44 @@
         </div>
       </section>
 
+      <section class="panel panel--feedback">
+        <div class="panel__column panel__column--full">
+          <h2>3. Помогите улучшить модель</h2>
+          <p class="muted">
+            Если модель ошиблась или требуется уточнение, выберите правильную тональность и
+            добавьте комментарий. Правки сохраняются в журнал и используются для дообучения.
+          </p>
+          <form id="correction-form" class="feedback-form">
+            <fieldset class="feedback-form__choices">
+              <legend>Верная тональность</legend>
+              <label>
+                <input type="radio" name="user-label" value="positive" />
+                Положительная
+              </label>
+              <label>
+                <input type="radio" name="user-label" value="neutral" />
+                Нейтральная
+              </label>
+              <label>
+                <input type="radio" name="user-label" value="negative" />
+                Отрицательная
+              </label>
+            </fieldset>
+            <label for="feedback-notes">Комментарий (опционально)</label>
+            <textarea
+              id="feedback-notes"
+              rows="3"
+              maxlength="500"
+              placeholder="Например: модель не учла вторую часть сообщения"
+            ></textarea>
+            <button type="submit" id="feedback-submit">Отправить исправление</button>
+            <p id="feedback-status" class="feedback-form__status">
+              Сначала выполните анализ, чтобы отправить корректировку.
+            </p>
+          </form>
+        </div>
+      </section>
+
       <section class="panel">
         <div class="panel__column">
           <h2>Статистика за сессию</h2>

@@ -95,6 +95,77 @@ main {
   min-width: 260px;
 }
 
+.panel__column--full {
+  flex-basis: 100%;
+}
+
+.panel--feedback {
+  flex-direction: column;
+}
+
+.feedback-form {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.feedback-form--inactive {
+  opacity: 0.6;
+}
+
+.feedback-form--inactive button {
+  cursor: not-allowed;
+}
+
+.feedback-form__choices {
+  display: flex;
+  gap: 1.5rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 1rem;
+  padding: 1rem;
+  flex-wrap: wrap;
+}
+
+.feedback-form__choices legend {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.feedback-form__choices label {
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+}
+
+.feedback-form__choices input[type='radio'] {
+  accent-color: #1d4ed8;
+}
+
+.feedback-form textarea {
+  min-height: 90px;
+}
+
+.feedback-form button {
+  align-self: flex-start;
+}
+
+.feedback-form__status {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.feedback-form__status--success {
+  color: var(--positive);
+}
+
+.feedback-form__status--error {
+  color: var(--negative);
+}
+
 label {
   font-weight: 600;
   display: block;

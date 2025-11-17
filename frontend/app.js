@@ -7,7 +7,12 @@ const historyList = document.getElementById('history');
 const totalCounter = document.getElementById('total-counter');
 const modelName = document.getElementById('model-name');
 const modelDetail = document.getElementById('model-detail');
+const correctionForm = document.getElementById('correction-form');
+const feedbackNotes = document.getElementById('feedback-notes');
+const feedbackStatus = document.getElementById('feedback-status');
 let chart;
+let lastPrediction = null;
+let lastAnalyzedText = '';
 
 async function fetchJSON(url, options = {}) {
   const response = await fetch(url, {
@@ -34,7 +39,49 @@ function renderResult(prediction) {
   resultBlock.className = `result ${className}`;
   resultBlock.innerHTML = `<div><p class="muted">Модель определила тональность:</p><h3>${text}</h3></div>`;
   renderBars(scores);
+  lastPrediction = prediction;
+  setFeedbackEnabled(true);
+  selectFeedbackLabel(label);
 }
+
+function setFeedbackStatus(message, state = 'info') {
+  if (!feedbackStatus) return;
+  const classes = ['feedback-form__status'];
+  if (state === 'success') classes.push('feedback-form__status--success');
+  if (state === 'error') classes.push('feedback-form__status--error');
+  feedbackStatus.className = classes.join(' ');
+  feedbackStatus.textContent = message;
+}
+
+function setFeedbackEnabled(enabled) {
+  if (!correctionForm) return;
+  correctionForm.classList.toggle('feedback-form--inactive', !enabled);
+  const controls = correctionForm.querySelectorAll('input, textarea, button');
+  controls.forEach((control) => {
+    if (control === feedbackStatus) return;
+    control.disabled = !enabled;
+  });
+  if (!enabled) {
+    correctionForm.reset();
+    lastPrediction = null;
+    lastAnalyzedText = '';
+  }
+  setFeedbackStatus(
+    enabled
+      ? 'Если результат неверен, выберите правильную тональность и отправьте исправление.'
+      : 'Сначала выполните анализ, чтобы отправить корректировку.'
+  );
+}
+
+function selectFeedbackLabel(label) {
+  if (!correctionForm) return;
+  const radio = correctionForm.querySelector(`input[name="user-label"][value="${label}"]`);
+  if (radio) {
+    radio.checked = true;
+  }
+}
+
+setFeedbackEnabled(false);
 
 function renderBars(scores) {
   barsContainer.innerHTML = '';
@@ -138,6 +185,7 @@ form.addEventListener('submit', async (event) => {
   const text = textarea.value.trim();
   if (!text) return;
   form.classList.add('loading');
+  lastAnalyzedText = text;
   try {
     const prediction = await fetchJSON(`${API_BASE}/predict`, {
       method: 'POST',
@@ -149,10 +197,47 @@ form.addEventListener('submit', async (event) => {
   } catch (error) {
     resultBlock.className = 'result result--negative';
     resultBlock.innerHTML = `<p>Ошибка: ${error.message}</p>`;
+    setFeedbackEnabled(false);
   } finally {
     form.classList.remove('loading');
   }
 });
+
+if (correctionForm) {
+  correctionForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!lastPrediction || !lastAnalyzedText) {
+      setFeedbackStatus('Сначала выполните анализ текста.', 'error');
+      return;
+    }
+    const selected = correctionForm.querySelector('input[name="user-label"]:checked');
+    if (!selected) {
+      setFeedbackStatus('Выберите корректную тональность.', 'error');
+      return;
+    }
+    const payload = {
+      text: lastAnalyzedText,
+      predicted_label: lastPrediction.label,
+      user_label: selected.value,
+      scores: lastPrediction.scores,
+      notes: feedbackNotes && feedbackNotes.value.trim() ? feedbackNotes.value.trim() : undefined,
+    };
+    correctionForm.classList.add('loading');
+    try {
+      await fetchJSON(`${API_BASE}/feedback`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      setFeedbackStatus('Спасибо! Исправление сохранено.', 'success');
+      correctionForm.reset();
+      selectFeedbackLabel(lastPrediction.label);
+    } catch (error) {
+      setFeedbackStatus(`Ошибка: ${error.message}`, 'error');
+    } finally {
+      correctionForm.classList.remove('loading');
+    }
+  });
+}
 
 loadModelInfo();
 refreshStats();
