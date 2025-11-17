@@ -125,6 +125,77 @@
         </div>
       </section>
 
+      <section class="panel panel--reports">
+        <div class="panel__column">
+          <h2>5. Метрики качества модели</h2>
+          <p class="muted">
+            Отчёт генерируется командой Data Science командой через <code>make evaluate</code>. После обучения
+            обновите страницу, чтобы увидеть Accuracy, Macro F1 и таблицу <code>classification_report</code>.
+          </p>
+          <div class="report-grid">
+            <div class="report-card">
+              <p class="report-card__label">Accuracy</p>
+              <p class="report-card__value" id="metric-accuracy">—</p>
+              <p class="report-card__hint" id="metrics-dataset">Запустите make evaluate</p>
+            </div>
+            <div class="report-card">
+              <p class="report-card__label">Macro F1</p>
+              <p class="report-card__value" id="metric-macro-f1">—</p>
+              <p class="report-card__hint" id="metrics-updated"></p>
+            </div>
+          </div>
+          <div class="metrics-table" id="metrics-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Класс</th>
+                  <th>Precision</th>
+                  <th>Recall</th>
+                  <th>F1</th>
+                  <th>Support</th>
+                </tr>
+              </thead>
+              <tbody id="metrics-table-body">
+                <tr>
+                  <td colspan="5" class="muted">Метрики появятся после запуска make evaluate</td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="metrics-confusion" id="metrics-confusion"></div>
+          </div>
+        </div>
+        <div class="panel__column">
+          <h2>6. Сводка истории обращений</h2>
+          <p class="muted">
+            Чтобы обновить показатели, выполните <code>make history-report</code>. Скрипт агрегирует
+            <code>data/prediction_history.jsonl</code> в удобную статистику.
+          </p>
+          <div class="report-grid report-grid--vertical">
+            <div class="report-card">
+              <p class="report-card__label">Всего записей</p>
+              <p class="report-card__value" id="history-total">0</p>
+              <p class="report-card__hint" id="history-range">Нет отчёта</p>
+            </div>
+            <div class="report-card">
+              <p class="report-card__label">Средняя длина</p>
+              <p class="report-card__value" id="history-average">0</p>
+              <p class="report-card__hint">символов</p>
+            </div>
+          </div>
+          <div class="history-summary" id="history-summary">
+            <div>
+              <h4>Распределение классов</h4>
+              <ul id="history-labels" class="history-list"></ul>
+            </div>
+            <div>
+              <h4>Активность по датам</h4>
+              <ul id="history-dates" class="history-list"></ul>
+            </div>
+            <p class="muted" id="history-updated"></p>
+          </div>
+        </div>
+      </section>
+
       <section class="panel">
         <div class="panel__column">
           <h2>Статистика за сессию</h2>

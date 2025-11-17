@@ -96,3 +96,30 @@ class FilePredictionSummary(BaseModel):
 class FilePredictResponse(BaseModel):
     summary: FilePredictionSummary
     predictions: List[FilePrediction]
+
+
+class ConfusionMatrixPayload(BaseModel):
+    labels: List[str]
+    matrix: List[List[int]]
+
+
+class EvalMetricsResponse(BaseModel):
+    dataset: str
+    model: str
+    num_records: int
+    accuracy: float
+    macro_f1: float
+    classification_report: Dict[str, Dict[str, float]]
+    labels: List[str]
+    confusion_matrix: ConfusionMatrixPayload
+    generated_at: Optional[str] = None
+
+
+class HistorySummaryResponse(BaseModel):
+    total_predictions: int
+    label_counts: Dict[str, int]
+    date_counts: Dict[str, int]
+    first_timestamp: Optional[str]
+    last_timestamp: Optional[str]
+    average_text_length: float
+    generated_at: Optional[str] = None

@@ -3,7 +3,9 @@ __pycache__/
 models/*.joblib
 models/metadata.json
 models/transformer/
-reports/
+reports/*
+!reports/.gitkeep
+!reports/*.sample.json
 data/feedback.jsonl
 data/feedback_dataset.csv
 data/prediction_history.jsonl

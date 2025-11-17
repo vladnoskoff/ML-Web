@@ -17,6 +17,18 @@ const bulkStatus = document.getElementById('bulk-status');
 const bulkSummary = document.getElementById('bulk-summary');
 const bulkTable = document.getElementById('bulk-table');
 const bulkDownload = document.getElementById('bulk-download');
+const metricAccuracy = document.getElementById('metric-accuracy');
+const metricMacroF1 = document.getElementById('metric-macro-f1');
+const metricsDatasetInfo = document.getElementById('metrics-dataset');
+const metricsUpdated = document.getElementById('metrics-updated');
+const metricsTableBody = document.getElementById('metrics-table-body');
+const metricsConfusion = document.getElementById('metrics-confusion');
+const historyTotal = document.getElementById('history-total');
+const historyRange = document.getElementById('history-range');
+const historyAverage = document.getElementById('history-average');
+const historyLabelsList = document.getElementById('history-labels');
+const historyDatesList = document.getElementById('history-dates');
+const historyUpdated = document.getElementById('history-updated');
 let chart;
 let lastPrediction = null;
 let lastAnalyzedText = '';
@@ -130,6 +142,24 @@ function labelColor(label) {
   }
 }
 
+function formatPercent(value) {
+  return typeof value === 'number' ? `${(value * 100).toFixed(1)}%` : '—';
+}
+
+function formatSupport(value) {
+  if (typeof value === 'number') {
+    return value.toString();
+  }
+  return '—';
+}
+
+function getMetricValue(entry, key) {
+  if (!entry) return undefined;
+  if (key in entry) return entry[key];
+  const normalizedKey = key.replace('-', '_');
+  return entry[normalizedKey];
+}
+
 function updateHistory(history) {
   historyList.innerHTML = '';
   history.forEach((item) => {
@@ -194,6 +224,127 @@ async function loadModelInfo() {
   } catch (error) {
     modelName.textContent = 'Не удалось получить данные';
     console.error(error);
+  }
+}
+
+function renderClassificationReport(report) {
+  if (!metricsTableBody) return;
+  const entries = Object.entries(report || {}).filter(([, value]) => typeof value === 'object');
+  if (!entries.length) {
+    metricsTableBody.innerHTML = `
+      <tr>
+        <td colspan="5" class="muted">Метрики появятся после запуска make evaluate.</td>
+      </tr>
+    `;
+    return;
+  }
+  metricsTableBody.innerHTML = entries
+    .map(([label, metrics]) => {
+      const precision = formatPercent(getMetricValue(metrics, 'precision'));
+      const recall = formatPercent(getMetricValue(metrics, 'recall'));
+      const f1 = formatPercent(getMetricValue(metrics, 'f1-score') ?? getMetricValue(metrics, 'f1_score'));
+      const support = formatSupport(metrics?.support);
+      return `
+        <tr>
+          <td>${label}</td>
+          <td>${precision}</td>
+          <td>${recall}</td>
+          <td>${f1}</td>
+          <td>${support}</td>
+        </tr>`;
+    })
+    .join('');
+}
+
+function renderConfusionMatrix(confusion) {
+  if (!metricsConfusion) return;
+  if (!confusion?.labels?.length || !confusion?.matrix?.length) {
+    metricsConfusion.textContent = 'Матрица ошибок появится после запуска make evaluate.';
+    return;
+  }
+  const rows = confusion.labels
+    .map((label, rowIndex) => {
+      const row = confusion.matrix[rowIndex] || [];
+      const cells = row
+        .map((value, colIndex) => `${confusion.labels[colIndex] || colIndex}: ${value}`)
+        .join(', ');
+      return `<li><strong>${label}</strong> → ${cells}</li>`;
+    })
+    .join('');
+  metricsConfusion.innerHTML = `
+    <strong>Матрица ошибок</strong>
+    <ul class="history-list">${rows}</ul>
+  `;
+}
+
+function renderCountsList(element, data, emptyMessage) {
+  if (!element) return;
+  const entries = Object.entries(data || {});
+  if (!entries.length) {
+    element.innerHTML = `<li class="muted">${emptyMessage}</li>`;
+    return;
+  }
+  element.innerHTML = entries
+    .map(([key, value]) => `<li><strong>${key}</strong>: ${value}</li>`)
+    .join('');
+}
+
+function formatDateRange(start, end) {
+  if (!start && !end) return 'Нет отчёта';
+  const toLocale = (value) =>
+    value ? new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+  return `${toLocale(start)} — ${toLocale(end)}`;
+}
+
+async function loadEvalMetrics() {
+  if (!metricAccuracy) return;
+  try {
+    const metrics = await fetchJSON(`${API_BASE}/reports/metrics`);
+    metricAccuracy.textContent = formatPercent(metrics.accuracy);
+    metricMacroF1.textContent = formatPercent(metrics.macro_f1);
+    metricsDatasetInfo.textContent = metrics.dataset ? `Датасет: ${metrics.dataset}` : '';
+    metricsUpdated.textContent = metrics.generated_at
+      ? `Обновлено: ${new Date(metrics.generated_at).toLocaleString()}`
+      : '';
+    renderClassificationReport(metrics.classification_report);
+    renderConfusionMatrix(metrics.confusion_matrix);
+  } catch (error) {
+    metricAccuracy.textContent = '—';
+    metricMacroF1.textContent = '—';
+    metricsDatasetInfo.textContent = 'Нет отчёта — запустите make evaluate';
+    metricsUpdated.textContent = error.message || '';
+    if (metricsTableBody) {
+      metricsTableBody.innerHTML = `
+        <tr>
+          <td colspan="5" class="muted">${error.message || 'Не удалось загрузить метрики.'}</td>
+        </tr>
+      `;
+    }
+    if (metricsConfusion) {
+      metricsConfusion.textContent = '';
+    }
+  }
+}
+
+async function loadHistorySummary() {
+  if (!historyTotal) return;
+  try {
+    const summary = await fetchJSON(`${API_BASE}/reports/history`);
+    historyTotal.textContent = summary.total_predictions ?? 0;
+    historyAverage.textContent = Math.round(summary.average_text_length ?? 0);
+    historyRange.textContent = formatDateRange(summary.first_timestamp, summary.last_timestamp);
+    historyUpdated.textContent = summary.generated_at
+      ? `Обновлено: ${new Date(summary.generated_at).toLocaleString()}`
+      : '';
+    renderCountsList(historyLabelsList, summary.label_counts, 'Нет данных по классам.');
+    renderCountsList(historyDatesList, summary.date_counts, 'Нет данных по датам.');
+  } catch (error) {
+    historyTotal.textContent = '0';
+    historyAverage.textContent = '0';
+    historyRange.textContent = 'Нет отчёта — выполните make history-report';
+    historyUpdated.textContent = error.message || '';
+    if (historyLabelsList) historyLabelsList.innerHTML = '';
+    if (historyDatesList) historyDatesList.innerHTML = '';
   }
 }
 
@@ -403,4 +554,6 @@ if (bulkForm) {
 
 loadModelInfo();
 refreshStats();
+loadEvalMetrics();
+loadHistorySummary();
 setInterval(refreshStats, 5000);

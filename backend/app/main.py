@@ -13,13 +13,16 @@ from fastapi.staticfiles import StaticFiles
 from .config import settings
 from .feedback import FeedbackStore
 from .model import SentimentModel
+from .reports import ReportLoader
 from .schemas import (
     BatchPredictRequest,
     BatchPredictResponse,
+    EvalMetricsResponse,
     FilePredictResponse,
     FeedbackListResponse,
     FeedbackRequest,
     FeedbackResponse,
+    HistorySummaryResponse,
     ModelInfoResponse,
     PredictRequest,
     PredictResponse,
@@ -48,6 +51,10 @@ stats_tracker = StatsTracker(
     max_history=settings.stats_max_history, history_path=settings.history_path
 )
 feedback_store = FeedbackStore(settings.feedback_path, cache_size=200)
+report_loader = ReportLoader(
+    eval_metrics_path=settings.eval_metrics_path,
+    history_summary_path=settings.history_summary_path,
+)
 
 
 @app.on_event("startup")
@@ -167,6 +174,8 @@ def root() -> dict:
             "/predict_file",
             "/stats",
             "/model",
+            "/reports/metrics",
+            "/reports/history",
             "/health",
         ],
     }
@@ -182,6 +191,28 @@ def stats() -> StatsResponse:
 def model_info() -> ModelInfoResponse:
     model = _require_model()
     return ModelInfoResponse(**model.metadata)
+
+
+@app.get("/reports/metrics", response_model=EvalMetricsResponse)
+def evaluation_report() -> EvalMetricsResponse:
+    payload = report_loader.load_eval_metrics()
+    if not payload:
+        raise HTTPException(
+            status_code=404,
+            detail="Метрики ещё не сгенерированы. Запустите make evaluate после обучения модели.",
+        )
+    return EvalMetricsResponse(**payload)
+
+
+@app.get("/reports/history", response_model=HistorySummaryResponse)
+def history_report() -> HistorySummaryResponse:
+    payload = report_loader.load_history_summary()
+    if not payload:
+        raise HTTPException(
+            status_code=404,
+            detail="Нет агрегированного отчёта. Выполните make history-report для генерации.",
+        )
+    return HistorySummaryResponse(**payload)
 
 
 @app.post("/feedback", response_model=FeedbackResponse)
