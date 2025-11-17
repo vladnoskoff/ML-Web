@@ -27,6 +27,14 @@ class BatchPredictResponse(BaseModel):
     predictions: List[PredictResponse]
 
 
+class FeedbackRequest(BaseModel):
+    text: constr(strip_whitespace=True, min_length=1, max_length=2000)
+    predicted_label: constr(strip_whitespace=True, min_length=1)
+    user_label: Optional[constr(strip_whitespace=True, min_length=1)] = None
+    scores: Optional[Dict[str, float]] = None
+    notes: Optional[constr(strip_whitespace=True, min_length=1, max_length=500)] = None
+
+
 class PredictionHistoryItem(BaseModel):
     text: str
     label: str
@@ -38,6 +46,25 @@ class StatsResponse(BaseModel):
     total_predictions: int
     label_distribution: Dict[str, float]
     recent_predictions: List[PredictionHistoryItem]
+
+
+class FeedbackItem(BaseModel):
+    text: str
+    predicted_label: str
+    user_label: Optional[str]
+    scores: Optional[Dict[str, float]] = None
+    notes: Optional[str] = None
+    timestamp: str
+
+
+class FeedbackResponse(BaseModel):
+    status: str
+    entry: FeedbackItem
+
+
+class FeedbackListResponse(BaseModel):
+    total_items: int
+    items: List[FeedbackItem]
 
 
 class ModelInfoResponse(BaseModel):

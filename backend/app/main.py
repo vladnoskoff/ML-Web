@@ -8,10 +8,14 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from .feedback import FeedbackStore
 from .model import SentimentModel
 from .schemas import (
     BatchPredictRequest,
     BatchPredictResponse,
+    FeedbackListResponse,
+    FeedbackRequest,
+    FeedbackResponse,
     ModelInfoResponse,
     PredictRequest,
     PredictResponse,
@@ -21,6 +25,7 @@ from .stats import StatsTracker
 
 MODEL_PATH = Path("models/baseline.joblib")
 FRONTEND_DIR = Path("frontend")
+FEEDBACK_PATH = Path("data/feedback.jsonl")
 
 logging.basicConfig(level=logging.INFO)
 app = FastAPI(title="ML-Web Sentiment API", version="1.0.0")
@@ -38,6 +43,7 @@ if FRONTEND_DIR.exists():
 
 sentiment_model: SentimentModel | None = None
 stats_tracker = StatsTracker(max_history=100)
+feedback_store = FeedbackStore(FEEDBACK_PATH, cache_size=200)
 
 
 @app.on_event("startup")
@@ -98,3 +104,23 @@ def stats() -> StatsResponse:
 def model_info() -> ModelInfoResponse:
     model = _require_model()
     return ModelInfoResponse(**model.metadata)
+
+
+@app.post("/feedback", response_model=FeedbackResponse)
+def submit_feedback(request: FeedbackRequest) -> FeedbackResponse:
+    entry = feedback_store.append(
+        text=request.text,
+        predicted_label=request.predicted_label,
+        user_label=request.user_label,
+        scores=request.scores,
+        notes=request.notes,
+    )
+    return FeedbackResponse(status="stored", entry=entry.to_dict())
+
+
+@app.get("/feedback", response_model=FeedbackListResponse)
+def list_feedback(limit: int = 50) -> FeedbackListResponse:
+    limit = max(1, min(limit, 200))
+    return FeedbackListResponse(
+        total_items=feedback_store.count(), items=feedback_store.recent(limit)
+    )

@@ -1,0 +1,2 @@
+{"text": "Спасибо за помощь с порталом", "predicted_label": "positive", "user_label": "positive", "scores": {"negative": 0.02, "neutral": 0.08, "positive": 0.9}, "notes": "Совпало с ожиданием", "timestamp": "2024-01-01T10:00:00+00:00"}
+{"text": "Приложение зависает на оплате", "predicted_label": "neutral", "user_label": "negative", "scores": {"negative": 0.3, "neutral": 0.5, "positive": 0.2}, "notes": "Попросили зафиксировать", "timestamp": "2024-01-02T15:30:00+00:00"}

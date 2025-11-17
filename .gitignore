@@ -3,5 +3,7 @@ __pycache__/
 models/*.joblib
 models/metadata.json
 reports/
+data/feedback.jsonl
+data/feedback_dataset.csv
 *.log
 .env
