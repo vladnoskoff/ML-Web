@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import io
 import logging
+import os
 from collections import Counter
 from pathlib import Path
 
@@ -27,7 +28,8 @@ from .schemas import (
 )
 from .stats import StatsTracker
 
-MODEL_PATH = Path("models/baseline.joblib")
+MODEL_PATH = Path(os.getenv("MODEL_PATH", "models/baseline.joblib"))
+TRANSFORMER_DIR = Path(os.getenv("TRANSFORMER_DIR", "models/transformer"))
 FRONTEND_DIR = Path("frontend")
 FEEDBACK_PATH = Path("data/feedback.jsonl")
 MAX_FILE_RECORDS = 1000
@@ -54,11 +56,15 @@ feedback_store = FeedbackStore(FEEDBACK_PATH, cache_size=200)
 @app.on_event("startup")
 def load_model() -> None:
     global sentiment_model
-    sentiment_model = SentimentModel(MODEL_PATH)
-    if not MODEL_PATH.exists():
+    target_path = MODEL_PATH
+    if not target_path.exists() and TRANSFORMER_DIR.exists():
+        target_path = TRANSFORMER_DIR
+        logger.info("Primary model missing, falling back to transformer dir %s", TRANSFORMER_DIR)
+    sentiment_model = SentimentModel(target_path)
+    if not target_path.exists():
         logger.warning(
-            "Model file %s is missing, using KeywordFallbackModel until training runs.",
-            MODEL_PATH,
+            "Model artifact %s is missing, using KeywordFallbackModel until training runs.",
+            target_path,
         )
     stats_tracker.reset()
 

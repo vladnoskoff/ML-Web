@@ -6,10 +6,11 @@ import json
 from pathlib import Path
 from typing import Dict, Tuple
 
-import joblib
 import numpy as np
 import pandas as pd
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, f1_score
+
+from backend.app.model import SentimentModel
 
 DEFAULT_DATA = Path("data/sample_reviews.csv")
 DEFAULT_MODEL = Path("models/baseline.joblib")
@@ -36,13 +37,9 @@ def evaluate_model(
     text_column: str,
     label_column: str,
 ) -> Dict[str, object]:
-    if not model_path.exists():
-        raise FileNotFoundError(
-            f"Model artifact not found: {model_path}. Run ml/train_baseline.py first."
-        )
-    pipeline = joblib.load(model_path)
+    model = SentimentModel(model_path)
     texts, labels = load_dataset(data_path, text_column, label_column)
-    predictions = pipeline.predict(texts)
+    predictions = [pred["label"] for pred in model.classify_batch(texts.tolist())]
 
     report = classification_report(labels, predictions, output_dict=True, digits=4)
     accuracy = accuracy_score(labels, predictions)

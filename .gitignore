@@ -2,6 +2,7 @@ __pycache__/
 *.pyc
 models/*.joblib
 models/metadata.json
+models/transformer/
 reports/
 data/feedback.jsonl
 data/feedback_dataset.csv
