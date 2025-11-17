@@ -1,6 +1,7 @@
 """Utilities to load and run the sentiment classifier."""
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Dict, Iterable, List
 
@@ -67,15 +68,29 @@ class KeywordFallbackModel:
 class SentimentModel:
     """Wrapper around a trained pipeline with a rule-based fallback."""
 
-    def __init__(self, model_path: Path):
+    def __init__(self, model_path: Path, metadata_path: Path | None = None):
         self.model_path = model_path
+        self.metadata_path = metadata_path or model_path.with_name("metadata.json")
         self.pipeline = self._load_pipeline(model_path)
-        self.labels: List[str] = list(self.pipeline.classes_)
+        self.labels: List[str] = list(getattr(self.pipeline, "classes_", ["negative", "neutral", "positive"]))
+        self.metadata = self._load_metadata()
 
     def _load_pipeline(self, model_path: Path):
         if joblib is None or not model_path.exists():
             return KeywordFallbackModel()
         return joblib.load(model_path)
+
+    def _load_metadata(self) -> Dict[str, object]:
+        if not self.metadata_path.exists():
+            return {
+                "model_path": str(self.model_path),
+                "algorithm": "KeywordFallbackModel",
+                "classes": self.labels,
+            }
+        try:
+            return json.loads(self.metadata_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return {"model_path": str(self.model_path), "classes": self.labels}
 
     def predict(self, text: str) -> Dict[str, float]:
         """Return class probabilities for a single text."""

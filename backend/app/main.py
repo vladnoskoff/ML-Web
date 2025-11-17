@@ -4,19 +4,37 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from .model import SentimentModel
 from .schemas import (
     BatchPredictRequest,
     BatchPredictResponse,
+    ModelInfoResponse,
     PredictRequest,
     PredictResponse,
+    StatsResponse,
 )
+from .stats import StatsTracker
 
 MODEL_PATH = Path("models/baseline.joblib")
+FRONTEND_DIR = Path("frontend")
 
-app = FastAPI(title="ML-Web Sentiment API", version="0.1.0")
+app = FastAPI(title="ML-Web Sentiment API", version="1.0.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+if FRONTEND_DIR.exists():
+    app.mount("/ui", StaticFiles(directory=FRONTEND_DIR, html=True), name="ui")
+
 sentiment_model: SentimentModel | None = None
+stats_tracker = StatsTracker(max_history=100)
 
 
 @app.on_event("startup")
@@ -28,6 +46,7 @@ def load_model() -> None:
         raise RuntimeError(
             "Model file is missing. Run `python ml/train_baseline.py` first."
         ) from exc
+    stats_tracker.reset()
 
 
 @app.get("/health")
@@ -45,6 +64,7 @@ def _require_model() -> SentimentModel:
 def predict(request: PredictRequest) -> PredictResponse:
     model = _require_model()
     result = model.classify(request.text)
+    stats_tracker.record(request.text, result["label"], result["scores"])
     return PredictResponse(**result)
 
 
@@ -52,6 +72,8 @@ def predict(request: PredictRequest) -> PredictResponse:
 def predict_batch(request: BatchPredictRequest) -> BatchPredictResponse:
     model = _require_model()
     predictions = model.classify_batch(request.texts)
+    for text, pred in zip(request.texts, predictions):
+        stats_tracker.record(text, pred["label"], pred["scores"])
     return BatchPredictResponse(predictions=[PredictResponse(**pred) for pred in predictions])
 
 
@@ -59,5 +81,17 @@ def predict_batch(request: BatchPredictRequest) -> BatchPredictResponse:
 def root() -> dict:
     return {
         "message": "Добро пожаловать в сервис анализа тональности",
-        "endpoints": ["/predict", "/predict_batch", "/health"],
+        "endpoints": ["/predict", "/predict_batch", "/stats", "/model", "/health"],
     }
+
+
+@app.get("/stats", response_model=StatsResponse)
+def stats() -> StatsResponse:
+    summary = stats_tracker.snapshot()
+    return StatsResponse(**summary)
+
+
+@app.get("/model", response_model=ModelInfoResponse)
+def model_info() -> ModelInfoResponse:
+    model = _require_model()
+    return ModelInfoResponse(**model.metadata)
