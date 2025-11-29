@@ -22,6 +22,14 @@ class SentimentModelTests(unittest.TestCase):
             self.assertIn("scores", item)
             self.assertEqual(set(item["scores"].keys()), set(model.labels))
 
+    def test_toxic_guardrail_forces_negative_label(self) -> None:
+        model = SentimentModel(Path("another_missing_model.joblib"))
+        toxic_text = "ты грязная тварь"
+        result = model.classify(toxic_text)
+
+        self.assertEqual(result["label"], "negative")
+        self.assertGreaterEqual(result["scores"]["negative"], 0.9)
+
 
 if __name__ == "__main__":
     unittest.main()
