@@ -140,6 +140,26 @@ python ml/train_baseline.py --test-size 0.2 --random-state 42
 
 CSV-файл также можно передать в `ml/train_transformer.py` через флаг `--data`.
 
+**Датасет Hack&Change (папка `hahaton/ТОНАЛЬНОСТЬ`).** В конкурсных материалах
+метки закодированы числами, и в описании была допущена ошибка. Актуальная
+разметка:
+
+- `0` — нейтральная;
+- `1` — положительная;
+- `2` — негативная.
+
+Чтобы не перепутать порядок и привести формат к строковым меткам, используйте
+скрипт конверсии перед обучением:
+
+```bash
+python ml/convert_hahaton_labels.py \
+  --input hahaton/ТОНАЛЬНОСТЬ/train.csv \
+  --output data/hahaton_train.csv
+```
+
+По умолчанию в выходном файле останутся только колонки `text` и `label`.
+Добавьте флаг `--keep-meta`, если нужны исходные `id`/`source`.
+
 ### 11.2 Быстрый старт
 1. **Установите зависимости:** `make install` (аналог `pip install -r requirements.txt`).
 2. **Проведите EDA или обучение:** `make eda` для генерации отчёта `reports/eda_summary.json`, затем `make train` для создания `models/baseline.joblib` и `models/metadata.json`. Хотите современный трансформер — запустите `make train-transformer`, он дообучит выбранную Hugging Face-модель (по умолчанию `cointegrated/rubert-tiny`) и сохранит её в `models/transformer/`.
