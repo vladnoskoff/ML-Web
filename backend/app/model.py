@@ -148,6 +148,22 @@ class TransformerAdapter(BaseAdapter):
 class SentimentModel:
     """Wrapper around a trained pipeline with a rule-based fallback."""
 
+    toxic_keywords = {
+        "сдох",
+        "тварь",
+        "сука",
+        "мраз",
+        "ненавижу",
+        "идиот",
+        "дурак",
+        "убью",
+        "урод",
+        "гнида",
+        "пошел на х",
+        "гадост",
+        "грязн",
+    }
+
     def __init__(self, model_path: Path, metadata_path: Path | None = None):
         self.model_path = model_path
         if metadata_path is not None:
@@ -161,6 +177,7 @@ class SentimentModel:
             getattr(self.adapter, "classes_", ["negative", "neutral", "positive"])
         )
         self.metadata = self._load_metadata()
+        self._negative_label = self._find_negative_label()
 
     def _build_adapter(self, model_path: Path) -> BaseAdapter:
         if model_path.is_dir() and (model_path / "config.json").exists():
@@ -191,7 +208,8 @@ class SentimentModel:
     def predict(self, text: str) -> Dict[str, float]:
         """Return class probabilities for a single text."""
         proba = self.adapter.predict_proba([text])[0]
-        return {label: float(score) for label, score in zip(self.labels, proba)}
+        probabilities = {label: float(score) for label, score in zip(self.labels, proba)}
+        return self._apply_guardrails(text, probabilities)
 
     def predict_label(self, text: str) -> str:
         return self.adapter.predict([text])[0]
@@ -202,15 +220,40 @@ class SentimentModel:
         return {"label": label, "scores": probabilities}
 
     def classify_batch(self, texts: List[str]) -> List[Dict[str, object]]:
+        results: List[Dict[str, object]] = []
         proba = self.adapter.predict_proba(texts)
-        labels = [
-            self.labels[max(range(len(self.labels)), key=lambda idx: row[idx])]
-            for row in proba
-        ]
-        return [
-            {
-                "label": label,
-                "scores": {cls: float(score) for cls, score in zip(self.labels, row)},
-            }
-            for label, row in zip(labels, proba)
-        ]
+        for text, row in zip(texts, proba):
+            probabilities = {cls: float(score) for cls, score in zip(self.labels, row)}
+            probabilities = self._apply_guardrails(text, probabilities)
+            label = max(probabilities.items(), key=lambda item: item[1])[0]
+            results.append({"label": label, "scores": probabilities})
+        return results
+
+    def _find_negative_label(self) -> str:
+        """Best-effort pick for the negative class label name."""
+
+        for label in self.labels:
+            if label.lower().startswith("neg"):
+                return label
+        return self.labels[0]
+
+    def _apply_guardrails(
+        self, text: str, probabilities: Dict[str, float]
+    ) -> Dict[str, float]:
+        """Force clearly токсичные сообщения в negative с высоким весом.
+
+        В продакшене может использоваться полноценная матрица модерации,
+        но здесь достаточно лёгкого правила на ключевые выражения, чтобы
+        оскорбления не маркировались как positive/neutral.
+        """
+
+        lower = text.casefold()
+        if not any(token in lower for token in self.toxic_keywords):
+            return probabilities
+
+        adjusted = {label: 0.01 for label in self.labels}
+        adjusted[self._negative_label] = 0.98
+        total = sum(adjusted.values())
+        if total:
+            adjusted = {label: score / total for label, score in adjusted.items()}
+        return adjusted
